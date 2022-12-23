@@ -1,94 +1,84 @@
-﻿// MPI.cpp : Этот файл содержит функцию "main". Здесь начинается и заканчивается выполнение программы.
-//
-#include "mpi.h"
-#include <iostream>
+﻿#include <iostream>
+#include <fstream>
+#include <mpi.h>
+#include <string>
 
-int main(int argc, char** argv)
-{
-    const int MAX = 20;
-    int rank, size;
-    int n, ibeg, iend;
 
+int main(int argc, char* argv[]) {
+    // инициализация MPI
     MPI_Init(&argc, &argv);
-    
+
+    int size, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
-    n = (MAX - 1) / size + 1;
-    ibeg = rank * n + 1;
-    iend = (rank + 1) * n;
-    for (int i = ibeg; i <= ((iend > MAX) ? MAX : iend); i++)
-    {
-        printf("Process: %d, %d^2=%d\n", rank, i, i * i);
+
+    // считываем размер массива N с клавиатуры или из файла
+    int N;
+    if (rank == 0) {
+        std::cout << "Enter the size of the array: ";
+        std::cin >> N;
+        // в этом случае мы считываем N с клавиатуры
+        // но можно также считывать N из файла, например:
+        // std::ifstream fin("input.txt");
+        // fin >> N;
     }
 
-    //// Размер массива
-    //const int N = 15;
-    //// Массив с элементами
-    //int data[N];
-    //// Заполняем массив случайными числами
-    //for (int i = 0; i < N; i++)
-    //{
-    //    data[i] = -10 + rand() % ((10 + 1) +10);;
-    //    printf("Process: %d\n",data[i]);
+    // рассылаем размер массива всем процессам
+    MPI_Bcast(&N, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
-    //}
-    //    
+    // выделяем память под массив
+    int* arr = new int[N];
 
-    //// Произведение отрицательных элементов
-    //int local_product = 1;
-    //// Разбиваем массив на части и распределяем по процессам
-    //for (int i = rank; i < N; i += size)
-    //    if (data[i] < 0)
-    //    {
-    //        local_product *= data[i];
-    //        printf("Process: %d, *%d=%d\n", rank, data[i], local_product);
-    //    
-    //    }
-    //        
+    // считываем массив с клавиатуры или из файла
+    for (int i = 0; i < N; i++)
+        arr[i] = -5 + rand() % ((5 + 1) + 5 );;
 
-    //// Собираем результаты от всех процессов
-    //int global_product;
-    //MPI_Reduce(&local_product, &global_product, 1, MPI_INT, MPI_PROD, 0, MPI_COMM_WORLD);
+    // рассылаем массив всем процессам
+    MPI_Bcast(arr, N, MPI_INT, 0, MPI_COMM_WORLD);
+    // разбиваем массив на части для каждого процесса
+    int local_size = N / size;
+    int* local_arr = new int[local_size];
+    MPI_Scatter(arr, local_size, MPI_INT, local_arr, local_size, MPI_INT, 0, MPI_COMM_WORLD);
 
-    //if (rank == 0)
-    //    std::cout << "Global product: " << global_product << std::endl;
+    // вычисляем результат для каждого процесса
+    int local_result = 1;
+    for (int i = 0; i < local_size; i++) {
+        if (local_arr[i] < 0) {
+            local_result *= local_arr[i];
+        }
+    }
 
+    // собираем результаты всех процессов
+    int global_result;
+    MPI_Reduce(&local_result, &global_result, 1, MPI_INT, MPI_PROD, 0, MPI_COMM_WORLD);
+        // сохраняем результаты вычислений в файл
+        std::ofstream fout;
+    fout.open(std::to_string(rank) + ".txt");
+    fout << "Process number: " << rank << std::endl;
+    fout << "Data size: " << local_size << std::endl;
+    fout << "Data: ";
+    for (int i = 0; i < local_size; i++) {
+        fout << local_arr[i] << " ";
+    }
+    fout << std::endl;
+    fout << "Result: " << local_result << std::endl;
+    fout.close();
+
+    // главный процесс сохраняет общий результат вычислений
+    if (rank == 0) {
+        std::ofstream fout;
+        fout.open("result.txt");
+        fout << "Processes number: " << size << std::endl;
+        fout << "Result: " << global_result << std::endl;
+        fout.close();
+    }
+
+    // освобождаем память
+    delete[] arr;
+    delete[] local_arr;
+
+    // завершаем работу MPI
     MPI_Finalize();
+
     return 0;
 }
-
-
-//int main(int argc, char** argv)
-//{
-//	const int MAX = 200;
-//	int rank, size;
-//	int n, ibeg, iend;
-//
-//	MPI_Init(&argc, &argv);
-//	MPI_Comm_size(MPI_COMM_WORLD, &size);
-//	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-//
-//	n = (MAX - 1) / size + 1;
-//	ibeg = rank * n + 1;
-//	iend = (rank + 1) * n;
-//	for (int i = ibeg; i <= ((iend > MAX) ? MAX : iend); i++)
-//	{
-//		printf("Process: %d, %d^2=%d\n", rank, i, i * i);
-//	}
-//
-//	MPI_Finalize();
-//
-//	return 0;
-//}
-
-// Запуск программы: CTRL+F5 или меню "Отладка" > "Запуск без отладки"
-// Отладка программы: F5 или меню "Отладка" > "Запустить отладку"
-
-// Советы по началу работы 
-//   1. В окне обозревателя решений можно добавлять файлы и управлять ими.
-//   2. В окне Team Explorer можно подключиться к системе управления версиями.
-//   3. В окне "Выходные данные" можно просматривать выходные данные сборки и другие сообщения.
-//   4. В окне "Список ошибок" можно просматривать ошибки.
-//   5. Последовательно выберите пункты меню "Проект" > "Добавить новый элемент", чтобы создать файлы кода, или "Проект" > "Добавить существующий элемент", чтобы добавить в проект существующие файлы кода.
-//   6. Чтобы снова открыть этот проект позже, выберите пункты меню "Файл" > "Открыть" > "Проект" и выберите SLN-файл.

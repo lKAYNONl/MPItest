@@ -1,0 +1,4 @@
+Process number: 0
+Data size: 10
+Data: 3 4 4 -4 2 0 0 5 -4 -5 
+Result: -80
